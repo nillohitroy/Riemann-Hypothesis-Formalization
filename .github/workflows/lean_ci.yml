@@ -1,0 +1,36 @@
+name: Lean 4 Build & Verification
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Lean project with Mathlib cache
+        uses: leanprover/lean-action@v1
+        with:
+          use-mathlib-cache: "true"
+          leanchecker: "true"
+
+      - name: Run Verification Audit Scripts
+        run: |
+          for f in Verification/Audit_*.lean; do
+            echo "=== Running $f ==="
+            lake env lean "$f" || exit 1
+          done
+
+      - name: Check for sorry / admit / axiom
+        run: |
+          if grep -rnE '\b(sorry|admit|axiom)\b' GrhFormalization/; then
+            echo "Found forbidden keyword!"
+            exit 1
+          fi
