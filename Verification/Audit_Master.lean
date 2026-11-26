@@ -1,8 +1,4 @@
-/-
-Copyright (c) 2026 Nillohit Roy. All rights reserved.
-Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Nillohit Roy
--/
+import Lean
 import GrhFormalization
 
 /-!
@@ -19,11 +15,11 @@ open Lean Elab Command
 namespace GRHIteratedThetaLifts.Verification.Master
 
 #eval show CommandElabM Unit from do
-  let env ← getEnv
   let allowed : List Name := [``propext, ``Classical.choice, ``Quot.sound]
   let targets : List Name := [
     -- Section 1
     ``GRHIteratedThetaLifts.Section1.dirichletL_eq_completed_div_gamma,
+    ``GRHIteratedThetaLifts.Section1.dirichletL_modOne_eq_riemannZeta,
     ``GRHIteratedThetaLifts.Section1.euler_factor_ne_zero_of_re_pos,
     ``GRHIteratedThetaLifts.Section1.cor_1_3_of_cor_1_2,
     -- Section 2
@@ -69,10 +65,10 @@ namespace GRHIteratedThetaLifts.Verification.Master
     ``GRHIteratedThetaLifts.Section7.assembleMainResults
   ]
   for decl in targets do
-    let (_, st) := (CollectAxioms.collect decl).run env {}
-    for ax in st.axioms do
+    let axioms ← collectAxioms decl
+    for ax in axioms do
       if ax ∉ allowed then
         throwError "STRICT MASTER AUDIT FAILED: `{decl}` depends on forbidden axiom `{ax}`!"
-  IO.println "STRICT MASTER AUDIT PASSED: All 38 declarations across Sections 1-7 verified under {propext, Classical.choice, Quot.sound}."
+  IO.println "STRICT MASTER AUDIT PASSED: All 39 declarations across Sections 1-7 verified under {propext, Classical.choice, Quot.sound}."
 
 end GRHIteratedThetaLifts.Verification.Master

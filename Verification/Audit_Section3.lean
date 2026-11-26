@@ -1,3 +1,4 @@
+import Lean
 import GrhFormalization.Section3_LandauTauberian
 
 open Lean Elab Command
@@ -14,8 +15,8 @@ open GRHIteratedThetaLifts.Section3
     ``thm_3_4_chebyshev_growth_zero_free
   ]
   for decl in targets do
-    let (_, st) := (CollectAxioms.collect decl).run env {}
-    for ax in st.axioms do
+    let axioms ← collectAxioms decl
+    for ax in axioms do
       if ax ∉ allowed then
         throwError "STRICT AUDIT FAILED: `{decl}` depends on forbidden axiom `{ax}`!"
   IO.println "STRICT AUDIT PASSED: Section 3 uses only {propext, Classical.choice, Quot.sound}."

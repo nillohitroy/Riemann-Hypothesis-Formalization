@@ -15,8 +15,8 @@ open GRHIteratedThetaLifts.Section5
     ``thm_5_10_seesaw_period_factorization
   ]
   for decl in targets do
-    let (_, st) := (CollectAxioms.collect decl).run env {}
-    for ax in st.axioms do
+    let axioms ← collectAxioms decl
+    for ax in axioms do
       if ax ∉ allowed then
         throwError "STRICT AUDIT FAILED: `{decl}` depends on forbidden axiom `{ax}`!"
   IO.println "STRICT AUDIT PASSED: Section 5 uses only {propext, Classical.choice, Quot.sound}."

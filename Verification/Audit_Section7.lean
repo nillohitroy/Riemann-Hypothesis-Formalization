@@ -3,6 +3,7 @@ Copyright (c) 2026 Nillohit Roy. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Nillohit Roy
 -/
+import Lean
 import GrhFormalization.Section7_CohomologyAndGRH
 
 open Lean Elab Command
@@ -48,8 +49,8 @@ namespace GRHIteratedThetaLifts.Verification.Section7
     ``assembleMainResults
   ]
   for decl in targets do
-    let (_, st) := (CollectAxioms.collect decl).run env {}
-    for ax in st.axioms do
+    let axioms ← collectAxioms decl
+    for ax in axioms do
       if ax ∉ allowed then
         throwError "STRICT SECTION 7 AUDIT FAILED: `{decl}` depends on forbidden axiom `{ax}`!"
   IO.println "STRICT SECTION 7 AUDIT PASSED: All Section 7 theorems use only {propext, Classical.choice, Quot.sound}."
