@@ -20,6 +20,7 @@ jobs:
         with:
           use-mathlib-cache: "true"
           leanchecker: "true"
+          leanchecker-args: "GrhFormalization"
 
       - name: Run Verification Audit Scripts
         run: |
