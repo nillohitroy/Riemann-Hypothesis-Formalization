@@ -19,8 +19,12 @@ jobs:
         uses: leanprover/lean-action@v1
         with:
           use-mathlib-cache: "true"
-          leanchecker: "true"
-          leanchecker-args: "GrhFormalization"
+          leanchecker: "false"
+
+      - name: Check environment with leanchecker (unlimited stack)
+        run: |
+          ulimit -s unlimited
+          lake env leanchecker --fresh GrhFormalization
 
       - name: Run Verification Audit Scripts
         run: |
