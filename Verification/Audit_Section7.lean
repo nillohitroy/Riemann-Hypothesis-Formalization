@@ -16,17 +16,16 @@ namespace GRHIteratedThetaLifts.Verification.Section7
   ∀ (γ_em : ℝ) (logDerivMap : Section3.PrimitiveChar → ℂ),
     Section3.LandauAnalyticBackend →
     Section6.Section6BreakthroughInterface γ_em logDerivMap →
-    Section2.PrimitiveLFunctionTheory →
     Statement_Theorem_1_1)
 
 #check (cor_7_8_grh :
-  Statement_Theorem_1_1 → Section2.PrimitiveLFunctionTheory → Statement_Corollary_1_2)
+  Statement_Theorem_1_1 → Statement_Corollary_1_2)
 
 #check (thm_7_9_riemann_hypothesis :
   Statement_Theorem_1_1 → Statement_Corollary_1_4)
 
 #check (assembleMainResults :
-  Statement_Theorem_1_1 → Section2.PrimitiveLFunctionTheory → ∃ _ : MainResultsBundle, True)
+  Statement_Theorem_1_1 → ∃ _ : MainResultsBundle, True)
 
 #print axioms thm_7_1_totally_complex_euler_factor
 #print axioms thm_7_3_large_prime_congruence_length

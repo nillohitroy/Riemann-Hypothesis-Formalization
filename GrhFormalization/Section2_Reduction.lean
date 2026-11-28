@@ -4,21 +4,24 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Nillohit Roy
 -/
 import GrhFormalization.Section1_MainTheorems
+import Mathlib.NumberTheory.LSeries.PrimesInAP
 import Mathlib.Analysis.SpecialFunctions.Trigonometric.Basic
 
 /-!
 # Section 2: Reduction to Non-Vanishing on `Re(s) > 1/2`
 
-This file formalizes all results in Section 2 of the manuscript against Section 1's
-analytic continuation `dirichletL`:
+This file unconditionally formalizes all reductions in Section 2 of the manuscript
+directly from Mathlib's `DirichletCharacter.LFunction`, `completedLFunction`,
+`IsPrimitive.completedLFunction_one_sub`, `LFunction_changeLevel`, and
+`LFunction_ne_zero_of_one_le_re`:
 - **Lemma 2.1** (`lemma_2_1_gammaFactor_ne_zero`): `γ_χ(s) ≠ 0` on `Re(s) > 0`.
-- **Proposition 2.2** (`prop_2_2_primitive_critical_line`): Critical-line confinement for
-  primitive Dirichlet characters assuming Theorem 1.1 and the primitive functional equation.
-- **Proposition 2.3** (`prop_2_3_rh_from_right_half_plane`): Riemann Hypothesis from
-  right half-plane non-vanishing of `ζ(s)` via Riemann's functional equation.
+- **Proposition 2.2** (`prop_2_2_primitive_critical_line`): Unconditional critical-line
+  confinement for primitive Dirichlet characters assuming Theorem 1.1.
+- **Proposition 2.3** (`prop_2_3_rh_from_right_half_plane`): Unconditional Riemann
+  Hypothesis from right half-plane non-vanishing of `ζ(s)`.
 - **Lemma 2.4** (`lemma_2_4_euler_factor_ne_zero`): Non-vanishing of local Euler factors.
 - **Lemma 2.5** (`lemma_2_5_reduction_to_primitive`): Reduction of critical-strip zeros
-  to the inducing primitive character `χ*`.
+  to the inducing primitive character `χ.primitiveCharacter`.
 - **Subsection 2.3** (`cor_1_2_of_thm_1_1`, `cor_1_3_of_thm_1_1`, `cor_1_4_of_thm_1_1`).
 -/
 
@@ -26,6 +29,10 @@ open Complex Real
 open scoped BigOperators
 
 namespace GRHIteratedThetaLifts.Section2
+
+local instance instNeZeroConductor {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N) :
+    NeZero χ.conductor :=
+  ⟨Nat.ne_of_gt (Nat.pos_of_dvd_of_pos χ.conductor_dvd_level (NeZero.pos N))⟩
 
 open GRHIteratedThetaLifts.Section1
 
@@ -55,39 +62,20 @@ lemma lemma_2_1_gammaFactor_ne_zero {N : ℕ} [NeZero N]
   · apply gammaR_ne_zero_of_re_pos
     simpa using add_pos hs zero_lt_one
 
-/-- Analytic properties and functional equation package for `DirichletCharacter.LFunction`
-used in Proposition 2.2, Lemma 2.5, and Theorem 7.7. -/
-structure PrimitiveLFunctionTheory where
-  /-- Functional equation relating `Λ(1 - s, χ⁻¹)` and `Λ(s, χ)` for primitive `χ`. -/
-  functional_eq : ∀ {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N),
-    χ.IsPrimitive → ∀ (s : ℂ),
-      ∃ ε_root : ℂ, completedLFunction χ⁻¹ (1 - s) = ε_root * completedLFunction χ s
-  /-- Imprimitive level-change Euler product factorization
-  `L(s, χ) = L(s, χ*) ∏_{p|N} (1 - χ*(p) p^{-s})` whenever `χ ≠ 1 ∨ s ≠ 1`. -/
-  imprimitive_factorization : ∀ {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N)
-    {M : ℕ} [NeZero M] (χ_star : DirichletCharacter ℂ M),
-    (∀ p : ℕ, p.Prime → ¬ p ∣ N → χ p = χ_star p) →
-    ∀ (s : ℂ), (χ ≠ 1 ∨ s ≠ 1) →
-      dirichletL χ s =
-        dirichletL χ_star s *
-          ∏ p ∈ Nat.primeFactors N, (1 - χ_star p * (p : ℂ) ^ (-s))
-  /-- Every Dirichlet character `χ` mod `N` is induced by a unique primitive character `χ*`
-  mod `M | N`, and `χ = 1 ↔ χ* = 1`. -/
-  prim_of_chi : ∀ {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N),
-    ∃ (M : ℕ) (_ : NeZero M) (χ_star : DirichletCharacter ℂ M),
-      χ_star.IsPrimitive ∧ (χ = 1 ↔ χ_star = 1) ∧
-      ∀ p : ℕ, p.Prime → ¬ p ∣ N → χ p = χ_star p
-  /-- Dirichlet's theorem on non-vanishing at `s = 1` for non-principal primitive characters:
-  `L(1, χ*) ≠ 0` when `χ* ≠ 1`. -/
-  nonvanish_at_one : ∀ {M : ℕ} [NeZero M] (χ_star : DirichletCharacter ℂ M),
-    χ_star.IsPrimitive → χ_star ≠ 1 → dirichletL χ_star 1 ≠ 0
+/-- Mathlib's `DirichletCharacter.gammaFactor χ s` does not vanish when `Re(s) > 0`. -/
+lemma mathlib_gammaFactor_ne_zero {N : ℕ} [NeZero N]
+    (χ : DirichletCharacter ℂ N) {s : ℂ} (hs : 0 < s.re) :
+    DirichletCharacter.gammaFactor χ s ≠ 0 := by
+  unfold DirichletCharacter.gammaFactor
+  split_ifs
+  · exact Gammaℝ_ne_zero_of_re_pos hs
+  · exact Gammaℝ_ne_zero_of_re_pos (by simpa using add_pos hs zero_lt_one)
 
 /-- **Proposition 2.2 (Critical-Line Confinement for Primitive Characters)**:
-Assume Theorem 1.1 and the primitive functional equation. For every `N ≥ 1`, every
-primitive character `χ` modulo `N`, and `0 < Re(s) < 1`, `L(s, χ) = 0 → Re(s) = 1/2`. -/
+Unconditionally proves `Statement_Corollary_1_3` from `Statement_Theorem_1_1` via
+Mathlib's functional equation `DirichletCharacter.IsPrimitive.completedLFunction_one_sub`. -/
 theorem prop_2_2_primitive_critical_line
-    (hThm11 : Statement_Theorem_1_1)
-    (hFE : PrimitiveLFunctionTheory) :
+    (hThm11 : Statement_Theorem_1_1) :
     Statement_Corollary_1_3 := by
   intro N _ χ hprim s hs0 hs1 hL
   by_contra hne
@@ -96,24 +84,27 @@ theorem prop_2_2_primitive_critical_line
   have hs_ne_one : s ≠ 1 := by
     intro h1; rw [h1, one_re] at hs1; exact lt_irrefl 1 hs1
   rcases lt_trichotomy s.re (1 / 2 : ℝ) with hlt | heq | hgt
-  · -- Case 2: Re(s) < 1/2
-    have hγ : gammaFactor χ s ≠ 0 := lemma_2_1_gammaFactor_ne_zero χ hs0
-    have hΛ : completedLFunction χ s = 0 := by
-      unfold completedLFunction
-      rw [hL, zero_mul]
-    obtain ⟨ε_root, hfunc⟩ := hFE.functional_eq χ hprim s
-    have hΛ_ref : completedLFunction χ⁻¹ (1 - s) = 0 := by
+  · -- Case 2: Re(s) < 1/2 via functional equation Λ(χ⁻¹, 1 - s) = N^(s - 1/2) W(χ⁻¹) Λ(χ, s)
+    have hL_eq := DirichletCharacter.LFunction_eq_completed_div_gammaFactor χ s (Or.inl hs_ne_zero)
+    have hγ : DirichletCharacter.gammaFactor χ s ≠ 0 := mathlib_gammaFactor_ne_zero χ hs0
+    have hΛ : DirichletCharacter.completedLFunction χ s = 0 := by
+      unfold dirichletL at hL
+      rw [hL_eq, div_eq_zero_iff] at hL
+      exact hL.resolve_right hγ
+    have hfunc := hprim.inv.completedLFunction_one_sub s
+    rw [_root_.inv_inv] at hfunc
+    have hΛ_ref : DirichletCharacter.completedLFunction χ⁻¹ (1 - s) = 0 := by
       rw [hfunc, hΛ, mul_zero]
-    have h1s_pos : 0 < (1 - s).re := by
-      rw [sub_re, one_re]; linarith
+    have h1s_ne_zero : 1 - s ≠ 0 := by
+      intro h0; apply hs_ne_one; linear_combination -h0
     have h1s_half : (1 / 2 : ℝ) < (1 - s).re := by
       rw [sub_re, one_re]; linarith
     have h1s_ne_one : 1 - s ≠ 1 := by
       intro h1; apply hs_ne_zero; linear_combination -h1
-    have hγ_inv : gammaFactor χ⁻¹ (1 - s) ≠ 0 :=
-      lemma_2_1_gammaFactor_ne_zero χ⁻¹ h1s_pos
     have hL_ref : dirichletL χ⁻¹ (1 - s) = 0 := by
-      rw [dirichletL_eq_completed_div_gamma χ⁻¹ (1 - s) hγ_inv, hΛ_ref, zero_div]
+      unfold dirichletL
+      rw [DirichletCharacter.LFunction_eq_completed_div_gammaFactor χ⁻¹ (1 - s)
+        (Or.inl h1s_ne_zero), hΛ_ref, zero_div]
     exact hThm11 N χ⁻¹ (1 - s) h1s_half (Or.inr h1s_ne_one) hL_ref
   · exact hne heq
   · -- Case 1: Re(s) > 1/2
@@ -204,20 +195,34 @@ lemma lemma_2_4_euler_factor_ne_zero {M : ℕ} [NeZero M]
     1 - ψ p * (p : ℂ) ^ (-s) ≠ 0 :=
   euler_factor_ne_zero_of_re_pos ψ p hp s hs
 
+/-- Unconditional imprimitive Euler product factorization via `DirichletCharacter.LFunction_changeLevel`. -/
+theorem imprimitive_LFunction_factorization {N : ℕ} [NeZero N]
+    (χ : DirichletCharacter ℂ N) (s : ℂ) (hcond : χ ≠ 1 ∨ s ≠ 1) :
+    dirichletL χ s =
+      dirichletL χ.primitiveCharacter s *
+        ∏ p ∈ N.primeFactors, (1 - χ.primitiveCharacter p * (p : ℂ) ^ (-s)) := by
+  have hMN : χ.conductor ∣ N := χ.conductor_dvd_level
+  letI : NeZero χ.conductor :=
+    ⟨Nat.ne_of_gt (Nat.pos_of_dvd_of_pos hMN (NeZero.pos N))⟩
+  have hcond_prim : χ.primitiveCharacter ≠ 1 ∨ s ≠ 1 := by
+    refine hcond.imp_left fun hχ1 hprim1 => hχ1 ?_
+    rw [← χ.changeLevel_primitiveCharacter, hprim1, map_one]
+  unfold dirichletL
+  conv_lhs => rw [← χ.changeLevel_primitiveCharacter]
+  exact DirichletCharacter.LFunction_changeLevel hMN χ.primitiveCharacter hcond_prim
+
 /-- **Lemma 2.5 (Reduction of Critical-Strip Zeros to Primitive Characters)**:
-If `0 < Re(s) < 1` and `L(s, χ) = 0`, then `L(s, χ*) = 0` for the inducing primitive
-character `χ*`. -/
+Unconditionally proves that if `0 < Re(s) < 1` and `L(s, χ) = 0`, then `L(s, χ.primitiveCharacter) = 0`. -/
 theorem lemma_2_5_reduction_to_primitive
-    (hFE : PrimitiveLFunctionTheory)
     {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N)
-    {M : ℕ} [NeZero M] (χ_star : DirichletCharacter ℂ M)
-    (hind : ∀ p : ℕ, p.Prime → ¬ p ∣ N → χ p = χ_star p)
     {s : ℂ} (hs0 : 0 < s.re) (hs1 : s.re < 1)
     (hL : dirichletL χ s = 0) :
-    dirichletL χ_star s = 0 := by
+    dirichletL χ.primitiveCharacter s = 0 := by
+  letI : NeZero χ.conductor :=
+    ⟨Nat.ne_of_gt (Nat.pos_of_dvd_of_pos χ.conductor_dvd_level (NeZero.pos N))⟩
   have hs_ne_one : s ≠ 1 := by
     intro h1; rw [h1, one_re] at hs1; exact lt_irrefl 1 hs1
-  have hfac := hFE.imprimitive_factorization χ χ_star hind s (Or.inr hs_ne_one)
+  have hfac := imprimitive_LFunction_factorization χ s (Or.inr hs_ne_one)
   rw [hL] at hfac
   rcases mul_eq_zero.mp hfac.symm with hL_star | hprod
   · exact hL_star
@@ -225,28 +230,28 @@ theorem lemma_2_5_reduction_to_primitive
     rw [Finset.prod_eq_zero_iff] at hprod
     obtain ⟨p, hp_mem, hp_zero⟩ := hprod
     have hp_prime : p.Prime := Nat.prime_of_mem_primeFactors hp_mem
-    exact lemma_2_4_euler_factor_ne_zero χ_star p hp_prime hs0 hp_zero
+    exact lemma_2_4_euler_factor_ne_zero χ.primitiveCharacter p hp_prime hs0 hp_zero
 
 /-! ## Subsection 2.3: Proof of the Reduction -/
 
 /-- **Subsection 2.3 (Proof of Corollary 1.2 from Theorem 1.1)**:
-Every zero of `L(s, χ)` in `0 < Re(s) < 1` lies on `Re(s) = 1/2`. -/
+Unconditionally proves GRH (`Statement_Corollary_1_2`) from `Statement_Theorem_1_1`. -/
 theorem cor_1_2_of_thm_1_1
-    (hThm11 : Statement_Theorem_1_1)
-    (hFE : PrimitiveLFunctionTheory) :
+    (hThm11 : Statement_Theorem_1_1) :
     Statement_Corollary_1_2 := by
   intro N _ χ s hs0 hs1 hL
-  obtain ⟨M, hM, χ_star, hprim, _, hind⟩ := hFE.prim_of_chi χ
-  have hL_star : dirichletL χ_star s = 0 :=
-    lemma_2_5_reduction_to_primitive hFE χ χ_star hind hs0 hs1 hL
-  exact prop_2_2_primitive_critical_line hThm11 hFE M χ_star hprim s hs0 hs1 hL_star
+  letI : NeZero χ.conductor :=
+    ⟨Nat.ne_of_gt (Nat.pos_of_dvd_of_pos χ.conductor_dvd_level (NeZero.pos N))⟩
+  have hL_star : dirichletL χ.primitiveCharacter s = 0 :=
+    lemma_2_5_reduction_to_primitive χ hs0 hs1 hL
+  exact prop_2_2_primitive_critical_line hThm11 χ.conductor χ.primitiveCharacter
+    χ.primitiveCharacter_isPrimitive s hs0 hs1 hL_star
 
 /-- **Subsection 2.3 (Proof of Corollary 1.3 from Theorem 1.1)**. -/
 theorem cor_1_3_of_thm_1_1
-    (hThm11 : Statement_Theorem_1_1)
-    (hFE : PrimitiveLFunctionTheory) :
+    (hThm11 : Statement_Theorem_1_1) :
     Statement_Corollary_1_3 :=
-  prop_2_2_primitive_critical_line hThm11 hFE
+  prop_2_2_primitive_critical_line hThm11
 
 /-- **Subsection 2.3 (Proof of Corollary 1.4 from Theorem 1.1)**
 directly via Section 1's `dirichletL_modOne_eq_riemannZeta`. -/

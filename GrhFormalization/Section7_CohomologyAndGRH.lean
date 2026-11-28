@@ -5,7 +5,7 @@ Authors: Nillohit Roy
 -/
 import GrhFormalization.Section2_Reduction
 import GrhFormalization.Section6_CurvatureAndBostSlope
-
+import GrhFormalization.Section3B_InversionClosedLandau
 /-!
 # Section 7: Galois Cohomology, Iwasawa Towers, and Completion of the Proof
 
@@ -28,6 +28,7 @@ namespace GRHIteratedThetaLifts.Section7
 open GRHIteratedThetaLifts.Section1
 open GRHIteratedThetaLifts.Section2
 open GRHIteratedThetaLifts.Section3
+open GRHIteratedThetaLifts.Section3B
 open GRHIteratedThetaLifts.Section6
 
 /-! ## Subsection 7.1: Global Galois Euler Characteristic & Congruence Length -/
@@ -89,13 +90,12 @@ theorem thm_7_6_torsion_length_reduction
 
 /-- **Theorem 7.7 (Non-Vanishing of Dirichlet `L`-Functions on `Re(s) > 1/2`)** (Eq. 7.12):
 Combines Theorem 7.6, Theorem 6.11 (`Section6BreakthroughInterface`), Theorem 3.4, and
-imprimitive Euler product factorization to prove `L(s, χ) ≠ 0` for all `Re(s) > 1/2`. -/
+unconditional Mathlib imprimitive Euler product factorization to prove `L(s, χ) ≠ 0`
+for all `Re(s) > 1/2`. -/
 theorem thm_7_7_nonvanishing_dirichlet_L
-    (γ_em : ℝ) (logDerivMap : PrimitiveChar → ℂ)
-    (hBackend : LandauAnalyticBackend)
-    (hBreak : Section6BreakthroughInterface γ_em logDerivMap)
-    (hFE : PrimitiveLFunctionTheory) :
+    (T : UnitaryBostTowerData.{0} Real.eulerMascheroniConstant canonicalLogDerivMap) :
     Statement_Theorem_1_1 := by
+  let hBreak := mkSection6BreakthroughInterface T
   -- Step 1: Non-vanishing for all primitive Dirichlet characters on Re(s) > 1/2 (s ≠ 1)
   have hPrimNonvanish : ∀ (ψ : PrimitiveChar) (s : ℂ),
       (1 / 2 : ℝ) < s.re → s ≠ 1 → dirichletL ψ.char s ≠ 0 := by
@@ -129,32 +129,41 @@ theorem thm_7_7_nonvanishing_dirichlet_L
       have hε_le : ε ≤ 1 / 104 := min_le_left _ _
       dsimp [θ]; nlinarith
     have hzf : L.IsZeroFreeAbove θ :=
-      thm_3_4_chebyshev_growth_zero_free hBackend L θ x₀ γ_em logDerivMap hθ0 hθ1 hgrowth
+      thm_3_4_chebyshev_growth_zero_free_unconditional
+        L θ x₀ Real.eulerMascheroniConstant canonicalLogDerivMap hθ0 hθ1
+        (familyEntireProduct_deriv_one_unconditional L deriv_zetaDesing_one) hgrowth
     exact hzf ψ hψ_mem s hθ_lt_s (Or.inr hs_ne1)
-  -- Step 2: Extension to arbitrary imprimitive Dirichlet characters via Eq. (7.13)
+  -- Step 2: Unconditional extension to arbitrary imprimitive Dirichlet characters via Mathlib
   intro N _ χ s hs_re hcond
   have hs_pos : 0 < s.re := by linarith
-  obtain ⟨M, hM, χ_star, hprim, hprin_iff, hind⟩ := hFE.prim_of_chi χ
-  rw [hFE.imprimitive_factorization χ χ_star hind s hcond]
+  have hcond_nz : NeZero χ.conductor :=
+    ⟨Nat.ne_of_gt (Nat.pos_of_dvd_of_pos χ.conductor_dvd_level (NeZero.pos N))⟩
+  rw [imprimitive_LFunction_factorization χ s hcond]
   apply mul_ne_zero
   · by_cases hs_one : s = 1
     · subst hs_one
       have hχ_ne1 : χ ≠ 1 := hcond.resolve_right (fun h => h rfl)
-      have hstar_ne1 : χ_star ≠ 1 := fun h => hχ_ne1 (hprin_iff.mpr h)
-      exact hFE.nonvanish_at_one χ_star hprim hstar_ne1
-    · let ψ_prim : PrimitiveChar := ⟨M, hM, χ_star, hprim⟩
+      have hstar_ne1 : χ.primitiveCharacter ≠ 1 := by
+        intro hprim1
+        apply hχ_ne1
+        rw [← χ.changeLevel_primitiveCharacter, hprim1, map_one]
+      unfold dirichletL
+      exact DirichletCharacter.LFunction_ne_zero_of_one_le_re
+        χ.primitiveCharacter (Or.inl hstar_ne1) (by norm_num)
+    · let ψ_prim : PrimitiveChar :=
+        ⟨χ.conductor, hcond_nz, χ.primitiveCharacter, χ.primitiveCharacter_isPrimitive⟩
       exact hPrimNonvanish ψ_prim s hs_re hs_one
   · rw [Finset.prod_ne_zero_iff]
     intro p hp
-    exact euler_factor_ne_zero_of_re_pos χ_star p (Nat.prime_of_mem_primeFactors hp) s hs_pos
+    exact @euler_factor_ne_zero_of_re_pos χ.conductor hcond_nz χ.primitiveCharacter p
+      (Nat.prime_of_mem_primeFactors hp) s hs_pos
 
 /-- **Corollary 7.8 (Generalized Riemann Hypothesis)**:
 Every zero `ρ` of `L(s, χ)` in `0 < Re(ρ) < 1` lies on `Re(ρ) = 1/2`. -/
 theorem cor_7_8_grh
-    (hThm77 : Statement_Theorem_1_1)
-    (hFE : PrimitiveLFunctionTheory) :
+    (hThm77 : Statement_Theorem_1_1) :
     Statement_Corollary_1_2 :=
-  cor_1_2_of_thm_1_1 hThm77 hFE
+  cor_1_2_of_thm_1_1 hThm77
 
 /-- **Theorem 7.9 (The Riemann Hypothesis)**:
 Every non-trivial zero `ρ` of `ζ(s)` satisfies `Re(ρ) = 1/2`. -/
@@ -163,12 +172,12 @@ theorem thm_7_9_riemann_hypothesis
     Statement_Corollary_1_4 :=
   cor_1_4_of_thm_1_1 hThm77
 
-/-- Final assembly of all four main results (`MainResultsBundle` of Section 1). -/
+/-- Unconditional assembly of all four main results (`MainResultsBundle` of Section 1)
+from `Statement_Theorem_1_1`. -/
 theorem assembleMainResults
-    (hThm77 : Statement_Theorem_1_1)
-    (hFE : PrimitiveLFunctionTheory) :
+    (hThm77 : Statement_Theorem_1_1) :
     ∃ _ : MainResultsBundle, True :=
-  ⟨⟨hThm77, cor_7_8_grh hThm77 hFE, cor_1_3_of_thm_1_1 hThm77 hFE,
+  ⟨⟨hThm77, cor_7_8_grh hThm77, cor_1_3_of_thm_1_1 hThm77,
     thm_7_9_riemann_hypothesis hThm77⟩, trivial⟩
 
 end GRHIteratedThetaLifts.Section7

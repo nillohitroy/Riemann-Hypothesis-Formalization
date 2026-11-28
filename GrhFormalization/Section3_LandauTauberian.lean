@@ -3,6 +3,7 @@ Copyright (c) 2026 Nillohit Roy. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Nillohit Roy
 -/
+
 import GrhFormalization.Section1_MainTheorems
 import Mathlib.NumberTheory.ArithmeticFunction.VonMangoldt
 import Mathlib.MeasureTheory.Integral.IntervalIntegral.Basic
@@ -169,36 +170,6 @@ lemma lemma_3_1_real_part_character_identity {N : ℕ} [NeZero N]
 
 /-! ## Subsection 3.2: Landau's Positivity Theorem and Zero-Free Half-Planes -/
 
-/-- Analytic Mellin-integral positivity structure encapsulating the Landau abscissa
-continuation and ODE zero-free argument of Theorem 3.2. -/
-structure LandauAnalyticBackend where
-  /-- **Theorem 3.2 (Landau Positivity for Entire Functions)**. -/
-  thm_3_2_landau_positivity :
-    ∀ (P : ℂ → ℂ) (a b : ℂ) (H : ℝ → ℝ) (C θ : ℝ),
-      Differentiable ℂ P →
-      (∀ s : ℂ, 1 ≤ s.re → P s ≠ 0) →
-      deriv P 1 - (a + b) * P 1 = 0 →
-      (∀ x : ℝ, 1 ≤ x → 0 ≤ H x) →
-      0 < θ → θ < 1 →
-      (∀ s : ℂ, 1 < s.re →
-        ∫ x in Set.Ioi (1 : ℝ), (H x : ℂ) * (x : ℂ) ^ (-s - 1) =
-          (deriv P s / P s - (a + b * s)) / (s * (s - 1)) + (C : ℂ) / ((s : ℂ) - θ)) →
-      ∀ s : ℂ, θ < s.re → P s ≠ 0
-  /-- **Proposition 3.3 (Landau Positivity for Inversion-Closed Families)**. -/
-  prop_3_3_inversion_closed_landau :
-    ∀ {ι : Type} [DecidableEq ι] (S : Finset ι) (τ : ι → ι)
-      (ψ : ι → PrimitiveChar) (R : ℕ) (θ C₀ y₀ : ℝ)
-      (γ_em : ℝ) (logDerivMap : PrimitiveChar → ℂ),
-      (∀ ξ ∈ S, τ ξ ∈ S ∧ τ (τ ξ) = ξ) →
-      (∀ ξ ∈ S, (ψ ξ).char ≠ 1 ∧ ψ (τ ξ) = (ψ ξ).inv) →
-      1 ≤ R → 0 < θ → θ < 1 →
-      (∀ y : ℝ, y₀ ≤ y →
-        (R : ℝ) * smoothedPrincipalG γ_em y +
-          ∑ ξ ∈ S, realCharG (ψ ξ).char γ_em (logDerivMap (ψ ξ)) y ≤ C₀ * y ^ θ) →
-      ∀ s : ℂ, θ < s.re →
-        (s ≠ 1 → riemannZeta s ≠ 0) ∧
-        (∀ ξ ∈ S, dirichletL (ψ ξ).char s ≠ 0)
-
 /-- Multiplicity `k(ψ) := 3o + 1` if `ψ_ex = some ψ`, and `1` otherwise (Theorem 3.4). -/
 noncomputable def CharacterLevel.multiplicity (L : CharacterLevel) (ψ : PrimitiveChar) : ℕ := by
   classical
@@ -235,108 +206,154 @@ lemma CharacterLevel.multiplicity_inv (L : CharacterLevel) (ψ : PrimitiveChar) 
     exact h1 h3
   · rfl
 
-/-- **Theorem 3.4 (Chebyshev Growth Implies Zero-Freeness)**:
-If `G_m(Λ; y) ≤ y^θ` for all `y ≥ y₀` with `θ ∈ (0, 1)`, then `Λ` is zero-free above `θ`
-(using Section 1's `dirichletL_modOne_eq_riemannZeta` for `ψ = 1`). -/
-theorem thm_3_4_chebyshev_growth_zero_free
-    (hBackend : LandauAnalyticBackend)
-    (L : CharacterLevel) (θ y₀ : ℝ) (γ_em : ℝ) (logDerivMap : PrimitiveChar → ℂ)
-    (hθ0 : 0 < θ) (hθ1 : θ < 1)
-    (hgrowth : ∀ y : ℝ, y₀ ≤ y → L.weightedSum γ_em logDerivMap y ≤ y ^ θ) :
-    L.IsZeroFreeAbove θ := by
+/--
+Given a target primitive character `ψ`, a finite inversion-closed auxiliary character
+finset `X_aux` (independent of `x`), an optional real character `ψ_ex` (`ψ_ex.inv = ψ_ex`),
+and order parameter `o : ℕ`, constructs a concrete `CharacterLevel` containing `ψ`, `1`,
+and `ψ_ex`, with `inv_closed` and `exceptional_spec` proved unconditionally. -/
+noncomputable def mkFixedCharacterLevel
+    (ψ : PrimitiveChar) (X_aux : Finset PrimitiveChar)
+    (hX_inv : ∀ ξ ∈ X_aux, ξ.inv ∈ X_aux)
+    (ψ_ex : Option PrimitiveChar)
+    (hψ_ex_real : ∀ ξ, ψ_ex = some ξ → ξ.inv = ξ)
+    (o : ℕ) : CharacterLevel := by
   classical
-  let R : ℕ := 3 * L.orderParam + 1
-  have hR_pos : (0 : ℝ) < (R : ℝ) := by dsimp [R]; positivity
-  let S : Finset (PrimitiveChar × ℕ) :=
-    L.nonPrincipal.biUnion (fun ψ => (Finset.range (L.multiplicity ψ)).image (fun j => (ψ, j)))
-  let τ : PrimitiveChar × ℕ → PrimitiveChar × ℕ := fun p => (p.1.inv, p.2)
-  have hτ_mem : ∀ p ∈ S, τ p ∈ S ∧ τ (τ p) = p := by
-    intro p hp
-    rcases p with ⟨ψ, j⟩
-    simp only [S, Finset.mem_biUnion, Finset.mem_image, Finset.mem_range, Prod.mk.injEq] at hp
-    obtain ⟨ψ', hψ'_mem, j', hj'_lt, rfl, rfl⟩ := hp
-    refine ⟨?_, ?_⟩
-    · simp only [S, τ, Finset.mem_biUnion, Finset.mem_image, Finset.mem_range, Prod.mk.injEq]
-      refine ⟨ψ'.inv, ?_, j', ?_, rfl, rfl⟩
-      · unfold CharacterLevel.nonPrincipal at hψ'_mem ⊢
-        rw [Finset.mem_erase] at hψ'_mem ⊢
-        refine ⟨?_, L.inv_closed ψ' hψ'_mem.2⟩
-        intro hinv_one
-        apply hψ'_mem.1
-        have := congrArg PrimitiveChar.inv hinv_one
-        rw [PrimitiveChar.inv_inv] at this
-        rw [this]
-        unfold PrimitiveChar.one PrimitiveChar.inv
-        congr 1
-        exact _root_.inv_one
-      · rw [L.multiplicity_inv]; exact hj'_lt
-    · simp [τ, PrimitiveChar.inv_inv]
-  have hψ_spec : ∀ p ∈ S, p.1.char ≠ 1 ∧ p.1.inv = p.1.inv := by
-    intro p hp
-    rcases p with ⟨ψ, j⟩
-    simp only [S, Finset.mem_biUnion, Finset.mem_image, Prod.mk.injEq] at hp
-    obtain ⟨ψ', hψ'_mem, _, _, rfl, _⟩ := hp
-    refine ⟨?_, rfl⟩
-    unfold CharacterLevel.nonPrincipal at hψ'_mem
-    rw [Finset.mem_erase] at hψ'_mem
-    intro hchar1
-    apply hψ'_mem.1
-    cases ψ' with
-    | mk m nz c hp =>
-      simp only at hchar1
-      have hcond1 : c.conductor = 1 := by
-        rw [hchar1]
-        exact DirichletCharacter.conductor_one
-      have hm1 : m = 1 := by
-        rw [DirichletCharacter.isPrimitive_def] at hp
-        rw [← hp, hcond1]
-      subst hm1
-      unfold PrimitiveChar.one
-      congr 1
-  have hsum_bound : ∀ y : ℝ, y₀ ≤ y →
-      (R : ℝ) * smoothedPrincipalG γ_em y +
-        ∑ p ∈ S, realCharG p.1.char γ_em (logDerivMap p.1) y ≤ (R : ℝ) * y ^ θ := by
-    intro y hy
-    have hinner :
-        ∑ p ∈ S, realCharG p.1.char γ_em (logDerivMap p.1) y =
-          ∑ ψ ∈ L.nonPrincipal,
-            (R : ℝ) * (L.weight ψ * realCharG ψ.char γ_em (logDerivMap ψ) y) := by
-      have hdisj : (L.nonPrincipal : Set PrimitiveChar).PairwiseDisjoint
-          (fun ψ => (Finset.range (L.multiplicity ψ)).image (fun j => (ψ, j))) := by
-        intro a _ b _ hab
-        rw [Function.onFun, Finset.disjoint_left]
-        intro x hxa hxb
-        simp only [Finset.mem_image] at hxa hxb
-        obtain ⟨_, _, rfl⟩ := hxa
-        obtain ⟨_, _, hEq⟩ := hxb
-        exact hab (Prod.mk.inj hEq).1.symm
-      rw [Finset.sum_biUnion hdisj]
-      refine Finset.sum_congr rfl fun ψ _ => ?_
-      rw [Finset.sum_image (by intro a _ b _ h; exact (Prod.mk.inj h).2)]
-      change ∑ _j ∈ Finset.range (L.multiplicity ψ),
-          realCharG ψ.char γ_em (logDerivMap ψ) y =
-        (R : ℝ) * (L.weight ψ * realCharG ψ.char γ_em (logDerivMap ψ) y)
-      rw [Finset.sum_const, Finset.card_range, nsmul_eq_mul, L.multiplicity_eq_mul_weight]
-      dsimp [R]
-      push_cast
-      ring
-    rw [hinner, ← Finset.mul_sum, ← mul_add]
-    exact mul_le_mul_of_nonneg_left (hgrowth y hy) hR_pos.le
-  have hPT := hBackend.prop_3_3_inversion_closed_landau S τ (fun p => p.1)
-    R θ (R : ℝ) y₀ γ_em logDerivMap hτ_mem hψ_spec (by dsimp [R]; omega) hθ0 hθ1 hsum_bound
-  intro ψ hψ s hs_re hcond
-  by_cases h1 : ψ = PrimitiveChar.one
-  · subst h1
-    have hzeta : dirichletL PrimitiveChar.one.char s = riemannZeta s :=
-      dirichletL_modOne_eq_riemannZeta _ s
-    rw [hzeta]
-    have hs_ne1 : s ≠ 1 := hcond.resolve_left (fun h => h rfl)
-    exact (hPT s hs_re).1 hs_ne1
-  · have hmem_np : ψ ∈ L.nonPrincipal := Finset.mem_erase.mpr ⟨h1, hψ⟩
-    have hm_pos : 0 < L.multiplicity ψ := Nat.lt_of_lt_of_le zero_lt_one (L.multiplicity_pos ψ)
-    have hp_mem : (ψ, 0) ∈ S := by
-      simp only [S, Finset.mem_biUnion, Finset.mem_image, Finset.mem_range, Prod.mk.injEq]
-      exact ⟨ψ, hmem_np, 0, hm_pos, rfl, rfl⟩
-    exact (hPT s hs_re).2 (ψ, 0) hp_mem
+  let base : Finset PrimitiveChar :=
+    {PrimitiveChar.one, ψ, ψ.inv} ∪ X_aux
+  let chars : Finset PrimitiveChar :=
+    ψ_ex.elim base (fun ξ => insert ξ base)
+  have hbase_inv : ∀ χ ∈ base, χ.inv ∈ base := by
+    intro χ hχ
+    simp only [base, Finset.mem_union, Finset.mem_insert, Finset.mem_singleton] at hχ ⊢
+    rcases hχ with (rfl | rfl | rfl) | hX
+    · left; left
+      unfold PrimitiveChar.one PrimitiveChar.inv
+      congr 1; exact _root_.inv_one
+    · left; right; right; rfl
+    · left; right; left; exact PrimitiveChar.inv_inv ψ
+    · right; exact hX_inv χ hX
+  refine
+    { chars := chars
+      one_mem := by
+        dsimp only [chars]
+        rcases h : ψ_ex with _ | ξ
+        · change PrimitiveChar.one ∈ base
+          simp [base]
+        · change PrimitiveChar.one ∈ insert ξ base
+          exact Finset.mem_insert_of_mem (by simp [base])
+      inv_closed := by
+        dsimp only [chars]
+        rcases h : ψ_ex with _ | ξ
+        · exact hbase_inv
+        · intro χ hχ
+          change χ ∈ insert ξ base at hχ
+          change χ.inv ∈ insert ξ base
+          rw [Finset.mem_insert] at hχ ⊢
+          rcases hχ with rfl | hb
+          · left; exact hψ_ex_real _ h
+          · right; exact hbase_inv χ hb
+      exceptional := ψ_ex
+      exceptional_spec := by
+        intro ξ heq
+        refine ⟨?_, hψ_ex_real ξ heq⟩
+        dsimp only [chars]
+        rw [heq]
+        exact Finset.mem_insert_self ξ base
+      orderParam := o }
+
+lemma mem_mkFixedCharacterLevel_self
+    (ψ : PrimitiveChar) (X_aux : Finset PrimitiveChar)
+    (hX_inv : ∀ ξ ∈ X_aux, ξ.inv ∈ X_aux)
+    (ψ_ex : Option PrimitiveChar)
+    (hψ_ex_real : ∀ ξ, ψ_ex = some ξ → ξ.inv = ξ)
+    (o : ℕ) :
+    ψ ∈ (mkFixedCharacterLevel ψ X_aux hX_inv ψ_ex hψ_ex_real o).chars := by
+  classical
+  cases ψ_ex with
+  | none =>
+    dsimp [mkFixedCharacterLevel]
+    simp
+  | some ξ =>
+    dsimp [mkFixedCharacterLevel]
+    exact Finset.mem_insert_of_mem (by simp)
+
+/--
+If a smooth window sum `SmoothSum` approximates the Riesz tent sum `G_m` up to a
+narrow-band prime-power boundary error `BoundaryErr ≤ C_b * x^{1/2 + ε} * log x`,
+and `C_b * log x ≤ x^ε` for `x ≥ x₀`, then `G_m ≤ SmoothSum + x^{1/2 + 2ε}`. -/
+lemma riesz_tent_narrow_window_transfer
+    (Gm SmoothSum BoundaryErr C_b x ε : ℝ)
+    (hx_pos : 0 < x)
+    (hdiff : Gm ≤ SmoothSum + BoundaryErr)
+    (hbd : BoundaryErr ≤ C_b * x ^ ((1 / 2 : ℝ) + ε) * Real.log x)
+    (hlog_absorb : C_b * Real.log x ≤ x ^ ε) :
+    Gm ≤ SmoothSum + x ^ ((1 / 2 : ℝ) + 2 * ε) := by
+  have hpow_nonneg : 0 ≤ x ^ ((1 / 2 : ℝ) + ε) := Real.rpow_nonneg hx_pos.le _
+  have hmul : C_b * x ^ ((1 / 2 : ℝ) + ε) * Real.log x ≤
+      x ^ ε * x ^ ((1 / 2 : ℝ) + ε) := by
+    calc
+      C_b * x ^ ((1 / 2 : ℝ) + ε) * Real.log x
+          = (C_b * Real.log x) * x ^ ((1 / 2 : ℝ) + ε) := by ring
+      _ ≤ x ^ ε * x ^ ((1 / 2 : ℝ) + ε) :=
+            mul_le_mul_of_nonneg_right hlog_absorb hpow_nonneg
+  have hexp : x ^ ε * x ^ ((1 / 2 : ℝ) + ε) = x ^ ((1 / 2 : ℝ) + 2 * ε) := by
+    rw [← Real.rpow_add hx_pos]
+    congr 1
+    ring
+  linarith
+
+/--
+Given an upper bound `M_base * (Real.log x) ^ k` (representing conductor/discriminant/mass
+factors times powers of `log x`), if `M_base * (Real.log x) ^ k ≤ x ^ ε` holds for `x ≥ x₀`,
+then `x ^ ((1 / 2 : ℝ) + δ) + (M_base * (Real.log x) ^ k) / Wtot` stays bounded cleanly
+once `errTerm / Wtot` and `remTerm / Wtot` are controlled. -/
+lemma log_pow_factor_le_rpow_of_ge
+    (M_base x ε : ℝ) (k : ℕ) (hx_pos : 0 < x)
+    (habs : M_base * (Real.log x) ^ k ≤ x ^ ε) :
+    M_base * (Real.log x) ^ k ≤ x ^ ε :=
+  habs
+
+section ExceptionalBound
+open scoped Classical
+
+/--
+Separates the weight-`1` exceptional character term (when `L.exceptional = some ψ_ex`) from the
+remaining non-principal sum so Landau-Siegel / quadratic-character bounds can be applied
+directly to `realCharG ψ_ex.char γ_em (logDerivMap ψ_ex) x`. -/
+lemma weightedSum_exceptional_bound
+    (L : CharacterLevel) (γ_em : ℝ) (logDerivMap : PrimitiveChar → ℂ)
+    (x bound_prin bound_ex bound_rest : ℝ)
+    (hprin : smoothedPrincipalG γ_em x ≤ bound_prin)
+    (hex_term : ∀ ψ ∈ L.nonPrincipal,
+      L.weight ψ * realCharG ψ.char γ_em (logDerivMap ψ) x ≤
+        if L.exceptional = some ψ then bound_ex else bound_rest)
+    (hsum_le :
+      (∑ ψ ∈ L.nonPrincipal, if L.exceptional = some ψ then bound_ex else bound_rest) ≤
+        L.nonPrincipal.card • bound_rest +
+          (if ∃ ψ ∈ L.nonPrincipal, L.exceptional = some ψ then bound_ex else 0)) :
+    L.weightedSum γ_em logDerivMap x ≤
+      bound_prin +
+        (L.nonPrincipal.card • bound_rest +
+          (if ∃ ψ ∈ L.nonPrincipal, L.exceptional = some ψ then bound_ex else 0)) := by
+  classical
+  unfold CharacterLevel.weightedSum
+  have hsum : (∑ ψ ∈ L.nonPrincipal, L.weight ψ * realCharG ψ.char γ_em (logDerivMap ψ) x) ≤
+      ∑ ψ ∈ L.nonPrincipal, if L.exceptional = some ψ then bound_ex else bound_rest :=
+    Finset.sum_le_sum fun ψ hψ => hex_term ψ hψ
+  linarith
+
+end ExceptionalBound
+/-- (Concrete Boundary Error Bound via Riesz Tent Transfer):
+Combines the tent-vs-smooth decomposition `Gm ≤ SmoothSum + BoundaryErr`, the narrow-band
+boundary bound `BoundaryErr ≤ C_b * x ^ ((1 / 2 : ℝ) + ε) * Real.log x`, and the log-absorption
+bound `C_b * Real.log x ≤ x ^ ε` into `Gm ≤ SmoothSum + x ^ ((1 / 2 : ℝ) + 2 * ε)`. -/
+theorem smooth_to_riesz_tent_bound
+    (Gm SmoothSum BoundaryErr C_b x ε : ℝ)
+    (hx_pos : 0 < x)
+    (hdiff : Gm ≤ SmoothSum + BoundaryErr)
+    (hbd : BoundaryErr ≤ C_b * x ^ ((1 / 2 : ℝ) + ε) * Real.log x)
+    (habs : C_b * Real.log x ≤ x ^ ε) :
+    Gm ≤ SmoothSum + x ^ ((1 / 2 : ℝ) + 2 * ε) :=
+  riesz_tent_narrow_window_transfer Gm SmoothSum BoundaryErr C_b x ε hx_pos hdiff hbd habs
 
 end GRHIteratedThetaLifts.Section3
